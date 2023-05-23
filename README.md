@@ -1,6 +1,7 @@
 # DMARC Reporter
 
-Tool to analyze failures from DMARC reports and send a mail to the domain owner(s) with the details of the failures.
+Tool to analyze failures from DMARC reports and send a mail to the domain owner(s) with the details of the failures.  
+Disclaimer: For now, it only works with mailboxes set up in Azure Active Directory.
 
 ## How to use
 
