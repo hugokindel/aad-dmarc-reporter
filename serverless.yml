@@ -12,7 +12,7 @@ provider:
   region: eu-west-1
   architecture: arm64
   deploymentBucket:
-    name: aws-cloud-formation-${self:service}
+    name: aws-mybucket-${self:service} # Change this.
     serverSideEncryption: AES256
 
 custom:
