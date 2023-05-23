@@ -1,0 +1,118 @@
+service: dmarc-reporter
+
+frameworkVersion: '3'
+
+plugins:
+  - serverless-deployment-bucket
+
+provider:
+  name: aws
+  stackName: ${self:service}
+  runtime: python3.9
+  region: eu-west-1
+  architecture: arm64
+  deploymentBucket:
+    name: aws-cloud-formation-${self:service}
+    serverSideEncryption: AES256
+
+custom:
+  # These values might need to be checked and modified from time to time as the secrets are deployed manually
+  # and as such, not analyzed by the CloudFormation configuration in case of configuration changes.
+  secretId: dmarc-reporter
+  secretArn:
+    - !Join
+      - ':'
+      - - 'arn:aws:secretsmanager'
+        - ${aws:region}
+        - ${aws:accountId}
+        - 'secret'
+        - dmarc-reporter # You need to change this value.
+  # These values are constant.
+  dmarcReporter: ${self:service}
+
+functions:
+  DmarcReporter:
+    name: ${self:custom.dmarcReporter}
+    description: >-
+      Tool to analyze failures from DMARC reports and send a mail to the domain owner(s) with the details 
+      of the failures.
+    handler: 'src/dmarc_reporter.main'
+    memorySize: 128
+    timeout: 60
+    role: DmarcReporterRole
+    layers:
+      - !Join
+        - ':'
+        - - 'arn:aws:lambda'
+          - ${aws:region}
+          - ${aws:accountId}
+          - 'layer:msal-python39:3'
+      - !Join
+        - ':'
+        - - 'arn:aws:lambda'
+          - ${aws:region}
+          - ${aws:accountId}
+          - 'layer:lxml-python39:8'
+    package:
+      patterns:
+        - 'src/dmarc_reporter.py'
+    environment:
+      AZURE_TENANT_ID: 123456ab-1234-1a23-1a2b-1ab234c56d78 # You need to change this value.
+      AZURE_USER_ID: 123456ab-1234-1a23-1a2b-1ab234c56d78 # You need to change this value.
+      AWS_SECRETSMANAGER_REGION: ${aws:region} # You might need to change this value.
+      AWS_SECRETSMANAGER_SECRET_ID: ${self:custom.dmarcReporter} # You might need to change this value.
+      NOTIFICATION_TARGETS: cybersecurity@example.com # You need to change this value.
+      EXCLUDED_SENDER_DOMAINS: me@example.com # You need to change or remove this value.
+    events:
+      - schedule:
+          enabled: true
+          rate: cron(0 0 * * ? *)
+
+package:
+  individually: true
+  patterns:
+    - '!./**'
+
+resources:
+  Description: >-
+    AWS CloudFormation template for DMARC Reporter
+
+  Resources:
+    DmarcReporterRole:
+      Type: 'AWS::IAM::Role'
+      Properties:
+        RoleName: ${self:custom.dmarcReporter}-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action: 'sts:AssumeRole'
+        Policies:
+          - PolicyName: ${self:custom.dmarcReporter}-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - 'logs:CreateLogGroup'
+                    - 'logs:CreateLogStream'
+                  Resource: !Join
+                    - ':'
+                    - - 'arn:aws:logs'
+                      - ${aws:region}
+                      - ${aws:accountId}
+                      - 'log-group:/aws/lambda/${self:custom.dmarcReporter}:*'
+                - Effect: Allow
+                  Action: 'logs:PutLogEvents'
+                  Resource: !Join
+                    - ':'
+                    - - 'arn:aws:logs'
+                      - ${aws:region}
+                      - ${aws:accountId}
+                      - 'log-group:/aws/lambda/${self:custom.dmarcReporter}:*:*'
+                - Effect: Allow
+                  Action: 'secretsmanager:GetSecretValue'
+                  Resource: ${self:custom.secretArn}

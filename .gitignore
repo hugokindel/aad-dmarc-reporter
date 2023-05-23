@@ -1,0 +1,16 @@
+# Project
+**/*.json
+
+# macOS
+**/.DS_Store
+
+# PyCharm
+**/.idea/**
+
+# Serverless
+**/.serverless/**
+
+# Node
+**/node_modules/**
+**/package-lock.json
+**/package.json
